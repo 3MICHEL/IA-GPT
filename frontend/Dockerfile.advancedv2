@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=on
+
+# Install uv and venv tools
+RUN apt-get update && apt-get install -y python3-venv python3-pip && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock ./
+RUN uv venv .venv --seed && .venv/bin/python -m pip install --no-cache-dir uv
+RUN .venv/bin/uv sync --frozen --no-dev
+
+# App sources
+COPY main.py ./
+COPY rest ./rest
+
+# Create non-root user
+RUN adduser --disabled-password --gecos "" nonroot
+USER nonroot
+
+EXPOSE 8501
+ENV PATH="/app/.venv/bin:${PATH}"
+
+CMD ["streamlit", "run", "main.py", "--server.address", "0.0.0.0", "--server.port", "8501"]
